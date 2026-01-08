@@ -10,7 +10,7 @@ st.title("⚡ 馬達振動與溫度即時預警平台")
 # 2. 載入資料
 @st.cache_data
 def load_data():
-    df = pd.read_csv('motor_data.xlsx - 工作表1.csv')
+    df = pd.read_csv('motor_data.csv')
     return df
 
 df = load_data()
@@ -62,4 +62,5 @@ if current_temp > temp_limit or current_vib_x > vib_limit or current_vib_z > vib
     if current_vib_x > vib_limit or current_vib_z > vib_limit:
         st.write("- 異常原因：振動幅度異常，可能存在結構鬆動或不平衡。")
 else:
+
     st.success("✅ 系統狀態：運行正常。")
