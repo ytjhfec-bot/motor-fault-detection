@@ -1,66 +1,63 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+import time
 
 # 1. 網頁配置
-st.set_page_config(page_title="馬達智慧監控系統", layout="wide")
-st.title("⚡ 馬達振動與溫度即時預警平台")
+st.set_page_config(page_title="馬達即時預警系統", layout="wide")
+st.title("⚡ 馬達智慧監控：10分鐘動態模擬演示")
 
 # 2. 載入資料
 @st.cache_data
-def load_data():
+def get_data():
     df = pd.read_csv('motor_data.csv')
     return df
 
-df = load_data()
+df_full = get_data()
 
-# 3. 側邊欄設定：預警閾值
-st.sidebar.header("預警參數設定")
-temp_limit = st.sidebar.slider("溫度警告閾值 (°C)", 40, 100, 60)
-vib_limit = st.sidebar.slider("振動警告閾值", 1.0, 5.0, 2.8, step=0.1)
+# 3. 側邊欄：控制演示
+st.sidebar.header("演示控制")
+start_btn = st.sidebar.button("🚀 開始即時監控演示")
+speed = st.sidebar.slider("模擬速度 (秒/筆)", 0.1, 1.0, 0.5)
 
-# 4. 主要儀表板內容
-col1, col2, col3 = st.columns(3)
+# 4. 建立動態容器 (Placeholders)
+# 這些容器會被後面的循環不斷更新內容
+metric_row = st.empty()
+chart_row = st.empty()
+status_row = st.empty()
 
-# 取得最新一筆數據
-latest_data = df.iloc[-1]
-current_temp = latest_data['temperature']
-current_vib_x = latest_data['vibration_x']
-current_vib_z = latest_data['vibration_z']
+# 5. 預警閾值
+temp_limit = 60
+vib_limit = 2.5
 
-with col1:
-    color = "inverse" if current_temp > temp_limit else "normal"
-    st.metric("當前溫度", f"{current_temp} °C", delta=f"{current_temp - temp_limit} °C", delta_color=color)
+# 6. 模擬「動態跳動」的邏輯
+if start_btn:
+    # 我們從第 1 筆資料開始，逐一增加顯示的資料量
+    for i in range(1, len(df_full) + 1):
+        # 取得目前為止的數據
+        current_view = df_full.iloc[:i]
+        latest = current_view.iloc[-1]
+        
+        # --- 更新上方數值 (Metrics) ---
+        with metric_row.container():
+            c1, c2, c3 = st.columns(3)
+            c1.metric("當前溫度", f"{latest['temperature']}°C")
+            c2.metric("X軸振動", f"{latest['vibration_x']}")
+            c3.metric("Z軸振動", f"{latest['vibration_z']}")
 
-with col2:
-    st.metric("X軸振動", f"{current_vib_x}", delta=f"{current_vib_x - vib_limit:.2f}", delta_color="inverse" if current_vib_x > vib_limit else "normal")
+        # --- 更新中段圖表 (Charts) ---
+        with chart_row.container():
+            # 只顯示最近的 50 筆數據，讓圖表有「滾動」感
+            display_df = current_view.tail(50) 
+            st.line_chart(display_df.set_index('timestamp')[['vibration_x', 'vibration_z', 'temperature']])
 
-with col3:
-    st.metric("Z軸振動", f"{current_vib_z}", delta=f"{current_vib_z - vib_limit:.2f}", delta_color="inverse" if current_vib_z > vib_limit else "normal")
+        # --- 更新下方診斷 (Alerts) ---
+        with status_row.container():
+            if latest['temperature'] > temp_limit or latest['vibration_x'] > vib_limit:
+                st.error(f"🚨 異常警報：{latest['timestamp']} 偵測到數值超標！")
+            else:
+                st.success("✅ 系統狀態：正常運行中...")
 
-# 5. 數據可視化
-st.subheader("📈 歷史趨勢追蹤")
-tab1, tab2 = st.tabs(["振動分析", "溫度監控"])
-
-with tab1:
-    fig_vib = px.line(df, x='timestamp', y=['vibration_x', 'vibration_z'], title="雙軸振動趨勢")
-    fig_vib.add_hline(y=vib_limit, line_dash="dash", line_color="red", annotation_text="警告線")
-    st.plotly_chart(fig_vib, use_container_width=True)
-
-with tab2:
-    fig_temp = px.area(df, x='timestamp', y='temperature', title="馬達溫度紀錄", color_discrete_sequence=['orange'])
-    fig_temp.add_hline(y=temp_limit, line_dash="dash", line_color="red", annotation_text="過熱閾值")
-    st.plotly_chart(fig_temp, use_container_width=True)
-
-# 6. 自動診斷預警
-st.subheader("🚨 系統診斷訊息")
-if current_temp > temp_limit or current_vib_x > vib_limit or current_vib_z > vib_limit:
-    st.error(f"⚠️ 警告：偵測到異常！時間：{latest_data['timestamp']}")
-    if current_temp > temp_limit:
-        st.write("- 異常原因：馬達溫度過高，請檢查散熱系統。")
-    if current_vib_x > vib_limit or current_vib_z > vib_limit:
-        st.write("- 異常原因：振動幅度異常，可能存在結構鬆動或不平衡。")
+        # 暫停一下，產生動畫效果
+        time.sleep(speed)
 else:
-
-    st.success("✅ 系統狀態：運行正常。")
+    st.info("請點擊左側『開始即時監控演示』按鈕來啟動數據模擬。")
